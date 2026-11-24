@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AirStock – Smart Retail Inventory & Billing</title>
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.383.0/dist/umd/lucide.min.js"></script>
+<style>
+:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px)}
+html,body{background:#f1f5f9;color:#1e293b;font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.no-sb::-webkit-scrollbar{display:none}
+html.dark{color-scheme:dark}
+.dark,.dark body{background:#020617;color:#e2e8f0}
+.dark .bg-white{background:#1e293b}
+.dark .bg-slate-50{background:#0f172a}
+.dark .bg-slate-100,.dark .bg-slate-200{background:#334155}
+.dark .border-slate-200,.dark .border-slate-100,.dark .border-slate-300{border-color:#334155}
+.dark .divide-slate-100>:not([hidden])~:not([hidden]){border-color:#334155}
+.dark .text-slate-900{color:#f1f5f9}.dark .text-slate-800{color:#e2e8f0}.dark .text-slate-700{color:#cbd5e1}
+.dark .text-slate-600,.dark .text-slate-500{color:#94a3b8}.dark .text-slate-400{color:#64748b}
+.dark .bg-emerald-50{background:rgba(16,185,129,.18)}.dark .bg-amber-50{background:rgba(245,158,11,.16)}
+.dark .bg-indigo-50{background:rgba(99,102,241,.2)}.dark .bg-rose-50{background:rgba(244,63,94,.18)}
+.dark .text-emerald-700{color:#6ee7b7}.dark .text-amber-700,.dark .text-amber-800{color:#fcd34d}
+.dark .text-indigo-700{color:#a5b4fc}.dark .text-rose-700{color:#fda4af}
+.dark .border-amber-200{border-color:rgba(245,158,11,.4)}
+.dark .bg-gradient-to-br{background:#1e293b}
+.dark .bg-slate-900{background:#0f172a}
+.dark aside{background:#0b1220;border-right:1px solid #1e293b}
+.dark select,.dark input{background:#0f172a;color:#e2e8f0;border-color:#334155}
+.dark input::placeholder{color:#64748b}
+.dark pre{background:#0f172a}
+.dark .bg-slate-900.text-white{background:#334155}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script>
+window.addEventListener("error",function(e){var r=document.getElementById("root");if(r&&!r.children.length)r.innerHTML="<pre style='padding:16px;color:#b91c1c;white-space:pre-wrap'>App error: "+e.message+" ("+(e.filename||"")+":"+e.lineno+")</pre>"});
+"use strict";
+const { useState, useMemo, useRef, useEffect } = React;
+const inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
+function Icon({ n, s = 20, c = '' }) {
+    let node = null;
+    try {
+        const d = window.lucide && window.lucide.icons && window.lucide.icons[n];
+        if (Array.isArray(d))
+            node = (d[0] === 'svg' && Array.isArray(d[2])) ? d[2] : d;
+        else if (d && Array.isArray(d.iconNode))
+            node = d.iconNode;
+    }
+    catch (e) { }
+    const kids = Array.isArray(node) ? node.filter(x => Array.isArray(x) && typeof x[0] === 'string').map((x, i) => React.createElement(x[0], Object.assign({}, x[1], { key: i }))) : null;
+    if (!kids)
+        return React.createElement("span", { style: { width: s, height: s, display: 'inline-block' } });
+    return React.createElement("svg", { width: s, height: s, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", className: c }, kids);
+}
+const SUP = { Staples: 'Gupta Wholesale', Snacks: 'Bansal Distributors', Beverages: 'Kumar Beverages', Household: 'Jain Traders', Sweets: 'Haldiram Depot' };
+const P = (id, name, emoji, cat, cost, base, mrp, stock, vel, thr) => ({ id, name, emoji, cat, cost, base, mrp, stock, vel, thr, supplier: SUP[cat], phone: '', ordered: false, orderQty: 0 });
+const SEED = [
+    P(1, 'Aashirvaad Atta 5kg', '🌾', 'Staples', 235, 255, 280, 40, 4, 15),
+    P(2, 'Tata Salt 1kg', '🧂', 'Staples', 22, 26, 28, 120, 6, 30),
+    P(3, 'Fortune Sunflower Oil 1L', '🛢️', 'Staples', 128, 142, 155, 14, 3, 12),
+    P(4, 'Maggi Noodles 4-pack', '🍜', 'Snacks', 46, 54, 60, 9, 7, 20),
+    P(5, 'Lay’s Classic 52g', '🥔', 'Snacks', 17, 19, 20, 150, 8, 40),
+    P(6, 'Parle-G 800g', '🍪', 'Snacks', 56, 64, 70, 8, 5, 15),
+    P(7, 'Haldiram Bhujia 400g', '🥨', 'Snacks', 88, 98, 110, 90, 2, 20),
+    P(8, 'Coca-Cola 750ml', '🥤', 'Beverages', 33, 38, 40, 28, 6, 20),
+    P(9, 'Real Mango Juice 1L', '🧃', 'Beverages', 78, 88, 99, 70, 2, 15),
+    P(10, 'Tata Tea Gold 500g', '🍵', 'Beverages', 215, 238, 260, 22, 2, 8),
+    P(11, 'Surf Excel 1kg', '🧼', 'Household', 118, 132, 150, 35, 3, 12),
+    P(12, 'Vim Dishwash Gel 500ml', '🧴', 'Household', 92, 102, 115, 6, 2, 10),
+    P(13, 'Colgate MaxFresh 150g', '🪥', 'Household', 78, 88, 98, 55, 2.5, 15),
+    P(14, 'Haldiram Soan Papdi 250g', '🎁', 'Sweets', 85, 98, 110, 30, 3, 12),
+];
+const MODES = {
+    normal: { label: 'Normal Season', icon: 'Sun', desc: 'Base selling prices, no adjustments.' },
+    festival: { label: 'Diwali Rush', icon: 'Sparkles', desc: 'Bump demand-heavy items up to 8%, never above MRP.' },
+    monsoon: { label: 'Monsoon Slowdown', icon: 'CloudRain', desc: 'Discount cold drinks, nudge cravings items.' },
+    clearance: { label: 'Clearance Mode', icon: 'Tag', desc: '12% off anything with 25+ days of stock.' },
+};
+function calc(p, mode) {
+    let pct = 0, why = '';
+    const days = p.stock / p.vel;
+    if (mode === 'festival' && ['Snacks', 'Beverages', 'Household', 'Sweets'].includes(p.cat)) {
+        pct = 8;
+        why = 'High festival demand: +8% under MRP';
+    }
+    else if (mode === 'monsoon') {
+        if (p.cat === 'Beverages') {
+            pct = -10;
+            why = 'Monsoon slowdown: -10% to move cold drinks';
+        }
+        else if (p.cat === 'Snacks') {
+            pct = 4;
+            why = 'Monsoon cravings: +4% on snacks';
+        }
+    }
+    else if (mode === 'clearance' && days > 25) {
+        pct = -12;
+        why = 'Overstock alert: -12% discount';
+    }
+    let price = Math.round(p.base * (1 + pct / 100));
+    if (price > p.mrp) {
+        price = p.mrp;
+        why += ' (capped at MRP)';
+    }
+    const floor = Math.ceil(p.cost * 1.02);
+    if (price < floor) {
+        price = floor;
+        why += ' (floored above cost)';
+    }
+    return { price, changed: price !== p.base, delta: price - p.base, why };
+}
+const Badge = ({ tone = 'slate', children }) => {
+    const t = { slate: 'bg-slate-100 text-slate-600', green: 'bg-emerald-50 text-emerald-700', amber: 'bg-amber-50 text-amber-700', indigo: 'bg-indigo-50 text-indigo-700', red: 'bg-rose-50 text-rose-700' }[tone];
+    return React.createElement("span", { className: `inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${t}` }, children);
+};
+const Card = ({ className = '', children }) => React.createElement("div", { className: `bg-white rounded-2xl border border-slate-200 shadow-sm ${className}` }, children);
+function Modal({ onClose, children }) {
+    return React.createElement("div", { className: "fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-900/50 p-0 sm:p-4", onClick: onClose },
+        React.createElement("div", { className: "bg-white w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl max-h-[90vh] overflow-y-auto p-5", style: { paddingBottom: 'calc(1.25rem + env(safe-area-inset-bottom,0px))' }, onClick: e => e.stopPropagation() }, children));
+}
+/* ---------- Dashboard ---------- */
+function Dashboard({ products, priced, mode, setMode, sales }) {
+    const value = products.reduce((a, p) => a + p.cost * p.stock, 0);
+    const retail = products.reduce((a, p) => a + priced[p.id].price * p.stock, 0);
+    const adj = products.filter(p => priced[p.id].changed);
+    const low = products.filter(p => p.stock <= p.thr);
+    const today = sales.reduce((a, s) => a + s.total, 0);
+    return React.createElement("div", { className: "space-y-5" },
+        React.createElement("div", { className: "grid grid-cols-2 lg:grid-cols-4 gap-3" },
+            React.createElement(Card, { className: "p-4" },
+                React.createElement("div", { className: "text-xs text-slate-500" }, "Inventory value (cost)"),
+                React.createElement("div", { className: "text-2xl font-bold text-slate-900 mt-1" }, inr(value)),
+                React.createElement("div", { className: "text-xs text-emerald-600 mt-1" },
+                    "Retail potential ",
+                    inr(retail))),
+            React.createElement(Card, { className: "p-4" },
+                React.createElement("div", { className: "text-xs text-slate-500" }, "Smart price adjustments"),
+                React.createElement("div", { className: "text-2xl font-bold text-indigo-600 mt-1" },
+                    adj.length,
+                    React.createElement("span", { className: "text-sm text-slate-400 font-normal" },
+                        " / ",
+                        products.length)),
+                React.createElement("div", { className: "text-xs text-slate-500 mt-1" }, MODES[mode].label)),
+            React.createElement(Card, { className: "p-4" },
+                React.createElement("div", { className: "text-xs text-slate-500" }, "Low-stock alerts"),
+                React.createElement("div", { className: "text-2xl font-bold text-amber-600 mt-1" }, low.length),
+                React.createElement("div", { className: "text-xs text-slate-500 mt-1" }, "Below reorder level")),
+            React.createElement(Card, { className: "p-4" },
+                React.createElement("div", { className: "text-xs text-slate-500" }, "Sales this session"),
+                React.createElement("div", { className: "text-2xl font-bold text-emerald-600 mt-1" }, inr(today)),
+                React.createElement("div", { className: "text-xs text-slate-500 mt-1" },
+                    sales.length,
+                    " bill(s)"))),
+        React.createElement(Card, { className: "p-4 sm:p-5" },
+            React.createElement("div", { className: "flex items-center gap-2 mb-1" },
+                React.createElement(Icon, { n: "Zap", c: "text-indigo-600" }),
+                React.createElement("h2", { className: "font-semibold text-slate-900" }, "Smart Pricing Simulator")),
+            React.createElement("p", { className: "text-sm text-slate-500 mb-3" }, "Pick a market condition. Prices update live everywhere, including billing, and never exceed MRP."),
+            React.createElement("div", { className: "grid grid-cols-2 lg:grid-cols-4 gap-2" }, Object.entries(MODES).map(([k, m]) => React.createElement("button", { key: k, onClick: () => setMode(k), className: `text-left p-3 min-h-[76px] rounded-xl border-2 transition ${mode === k ? 'border-indigo-600 bg-indigo-50' : 'border-slate-200 hover:border-slate-300'}` },
+                React.createElement("div", { className: "flex items-center gap-2 font-medium text-slate-900 text-sm" },
+                    React.createElement(Icon, { n: m.icon, s: 18, c: mode === k ? 'text-indigo-600' : 'text-slate-400' }),
+                    m.label),
+                React.createElement("div", { className: "text-xs text-slate-500 mt-1" }, m.desc))))),
+        React.createElement(Card, { className: "overflow-hidden" },
+            React.createElement("div", { className: "px-4 py-3 border-b border-slate-100 font-semibold text-slate-900" }, "Live Price List"),
+            React.createElement("div", { className: "divide-y divide-slate-100" }, products.map(p => {
+                const c = priced[p.id];
+                return React.createElement("div", { key: p.id, className: "p-3 sm:px-4 flex items-center gap-3" },
+                    React.createElement("div", { className: "text-2xl w-10 text-center" }, p.emoji),
+                    React.createElement("div", { className: "flex-1 min-w-0" },
+                        React.createElement("div", { className: "font-medium text-slate-900 text-sm truncate" }, p.name),
+                        React.createElement("div", { className: "text-xs text-slate-500" },
+                            "Cost ",
+                            inr(p.cost),
+                            " \u00B7 MRP ",
+                            inr(p.mrp),
+                            " \u00B7 Stock ",
+                            p.stock,
+                            " \u00B7 ",
+                            p.vel,
+                            "/day"),
+                        c.changed && React.createElement("div", { className: "mt-1" },
+                            React.createElement(Badge, { tone: c.delta > 0 ? 'green' : 'amber' },
+                                React.createElement(Icon, { n: c.delta > 0 ? 'TrendingUp' : 'TrendingDown', s: 12 }),
+                                c.why))),
+                    React.createElement("div", { className: "text-right" },
+                        React.createElement("div", { className: "font-bold text-slate-900" }, inr(c.price)),
+                        c.changed && React.createElement("div", { className: "text-xs text-slate-400 line-through" }, inr(p.base)),
+                        React.createElement("div", { className: "text-xs text-emerald-600" },
+                            Math.round((c.price - p.cost) / c.price * 100),
+                            "% margin")));
+            }))));
+}
+/* ---------- Billing ---------- */
+function Billing({ products, priced, sales, setSales, setProducts, toast, store }) {
+    const [q, setQ] = useState('');
+    const [cart, setCart] = useState({});
+    const [receipt, setReceipt] = useState(null);
+    const [cartOpen, setCartOpen] = useState(false);
+    const list = products.filter(p => p.name.toLowerCase().includes(q.toLowerCase()) || p.cat.toLowerCase().includes(q.toLowerCase()));
+    const change = (p, d) => {
+        const cur = cart[p.id] || 0, nx = Math.max(0, Math.min(p.stock, cur + d));
+        if (d > 0 && cur >= p.stock) {
+            toast('Only ' + p.stock + ' in stock');
+            return;
+        }
+        setCart(c => { const n = { ...c }; if (nx === 0)
+            delete n[p.id];
+        else
+            n[p.id] = nx; return n; });
+    };
+    const items = products.filter(p => cart[p.id]).map(p => ({ ...p, qty: cart[p.id], price: priced[p.id].price }));
+    const total = items.reduce((a, i) => a + i.price * i.qty, 0);
+    const mrpTotal = items.reduce((a, i) => a + i.mrp * i.qty, 0);
+    const count = items.reduce((a, i) => a + i.qty, 0);
+    const complete = () => {
+        if (!items.length)
+            return;
+        const r = { id: 'AS-' + (1001 + sales.length), time: new Date().toLocaleString('en-IN'), items: items.map(i => ({ name: i.name, qty: i.qty, price: i.price, mrp: i.mrp, id: i.id })), total, mrpTotal };
+        setSales(s => [...s, r]);
+        setProducts(ps => ps.map(p => cart[p.id] ? { ...p, stock: p.stock - cart[p.id] } : p));
+        setReceipt(r);
+        setCart({});
+        setCartOpen(false);
+    };
+    const CartPanel = React.createElement("div", { className: "flex flex-col h-full" },
+        React.createElement("div", { className: "font-semibold text-slate-900 mb-2 flex items-center gap-2" },
+            React.createElement(Icon, { n: "ShoppingCart", s: 18 }),
+            "Current Bill"),
+        React.createElement("div", { className: "flex-1 overflow-y-auto space-y-2" },
+            !items.length && React.createElement("div", { className: "text-sm text-slate-400 py-8 text-center" }, "Tap products to start a bill"),
+            items.map(i => React.createElement("div", { key: i.id, className: "flex items-center gap-2 text-sm" },
+                React.createElement("div", { className: "flex-1 min-w-0" },
+                    React.createElement("div", { className: "truncate font-medium text-slate-800" }, i.name),
+                    React.createElement("div", { className: "text-xs text-slate-500" },
+                        inr(i.price),
+                        " ",
+                        React.createElement("span", { className: "line-through" }, inr(i.mrp)))),
+                React.createElement("div", { className: "flex items-center gap-1" },
+                    React.createElement("button", { onClick: () => change(i, -1), className: "w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center" },
+                        React.createElement(Icon, { n: "Minus", s: 16 })),
+                    React.createElement("span", { className: "w-6 text-center font-semibold" }, i.qty),
+                    React.createElement("button", { onClick: () => change(i, 1), className: "w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center" },
+                        React.createElement(Icon, { n: "Plus", s: 16 }))),
+                React.createElement("div", { className: "w-16 text-right font-semibold" }, inr(i.price * i.qty))))),
+        React.createElement("div", { className: "border-t border-slate-100 mt-3 pt-3 space-y-1 text-sm" },
+            React.createElement("div", { className: "flex justify-between text-slate-500" },
+                React.createElement("span", null, "Total MRP"),
+                React.createElement("span", null, inr(mrpTotal))),
+            React.createElement("div", { className: "flex justify-between text-emerald-600 font-medium" },
+                React.createElement("span", null, "Customer saves"),
+                React.createElement("span", null, inr(mrpTotal - total))),
+            React.createElement("div", { className: "flex justify-between text-lg font-bold text-slate-900" },
+                React.createElement("span", null, "Payable"),
+                React.createElement("span", null, inr(total))),
+            React.createElement("button", { disabled: !items.length, onClick: complete, className: "w-full mt-2 h-12 rounded-xl bg-emerald-600 disabled:bg-slate-300 text-white font-semibold flex items-center justify-center gap-2" },
+                React.createElement(Icon, { n: "Check", s: 18 }),
+                "Complete Sale"),
+            !!items.length && React.createElement("button", { onClick: () => setCart({}), className: "w-full h-10 text-slate-500 text-sm flex items-center justify-center gap-1" },
+                React.createElement(Icon, { n: "Trash2", s: 14 }),
+                "Clear cart")));
+    return React.createElement("div", { className: "lg:grid lg:grid-cols-3 lg:gap-5" },
+        React.createElement("div", { className: "lg:col-span-2 space-y-3" },
+            React.createElement("div", { className: "relative" },
+                React.createElement("span", { className: "absolute left-3 top-3.5 text-slate-400" },
+                    React.createElement(Icon, { n: "Search", s: 18 })),
+                React.createElement("input", { value: q, onChange: e => setQ(e.target.value), placeholder: "Search products or category\u2026", className: "w-full h-12 pl-10 pr-3 rounded-xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-indigo-500" })),
+            React.createElement("div", { className: "grid grid-cols-2 md:grid-cols-3 gap-3" }, list.map(p => {
+                const c = priced[p.id], qty = cart[p.id] || 0, out = p.stock === 0;
+                return React.createElement("button", { key: p.id, disabled: out, onClick: () => change(p, 1), className: `relative text-left p-3 rounded-2xl border bg-white min-h-[130px] ${qty ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-slate-200'} ${out ? 'opacity-50' : ''}` },
+                    qty > 0 && React.createElement("span", { className: "absolute top-2 right-2 bg-emerald-600 text-white text-xs font-bold w-6 h-6 rounded-full flex items-center justify-center" }, qty),
+                    React.createElement("div", { className: "text-3xl" }, p.emoji),
+                    React.createElement("div", { className: "text-sm font-medium text-slate-900 mt-1 leading-tight" }, p.name),
+                    React.createElement("div", { className: "mt-1 flex items-baseline gap-2" },
+                        React.createElement("span", { className: "font-bold" }, inr(c.price)),
+                        React.createElement("span", { className: "text-xs text-slate-400 line-through" }, inr(p.mrp))),
+                    React.createElement("div", { className: "text-xs text-emerald-600" },
+                        "Save ",
+                        inr(p.mrp - c.price)),
+                    React.createElement("div", { className: `text-xs mt-1 ${p.stock <= p.thr ? 'text-amber-600' : 'text-slate-400'}` }, out ? 'Out of stock' : p.stock + ' in stock'));
+            }))),
+        React.createElement(Card, { className: "hidden lg:block p-4 h-[calc(100vh-6rem)] sticky top-4" }, CartPanel),
+        count > 0 && React.createElement("button", { onClick: () => setCartOpen(true), className: "lg:hidden fixed left-4 right-4 z-30 h-14 rounded-2xl bg-emerald-600 text-white font-semibold shadow-lg flex items-center justify-between px-5", style: { bottom: 'calc(4.75rem + env(safe-area-inset-bottom,0px))' } },
+            React.createElement("span", { className: "flex items-center gap-2" },
+                React.createElement(Icon, { n: "ShoppingCart", s: 18 }),
+                count,
+                " item(s)"),
+            React.createElement("span", null,
+                inr(total),
+                " \u00B7 View bill")),
+        cartOpen && React.createElement(Modal, { onClose: () => setCartOpen(false) },
+            React.createElement("div", { className: "min-h-[50vh]" }, CartPanel)),
+        receipt && React.createElement(Modal, { onClose: () => setReceipt(null) },
+            React.createElement("div", { className: "text-center" },
+                React.createElement("div", { className: "mx-auto w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center" },
+                    React.createElement(Icon, { n: "Check", s: 24 })),
+                React.createElement("h3", { className: "font-bold text-lg mt-2" }, "Sale Complete"),
+                React.createElement("div", { className: "text-xs text-slate-500" },
+                    store.name,
+                    " \u00B7 ",
+                    receipt.id,
+                    " \u00B7 ",
+                    receipt.time)),
+            React.createElement("div", { className: "mt-4 border-y border-dashed border-slate-300 py-3 space-y-1 text-sm" }, receipt.items.map(i => React.createElement("div", { key: i.id, className: "flex justify-between" },
+                React.createElement("span", null,
+                    i.name,
+                    " \u00D7 ",
+                    i.qty),
+                React.createElement("span", null, inr(i.price * i.qty))))),
+            React.createElement("div", { className: "mt-3 text-sm space-y-1" },
+                React.createElement("div", { className: "flex justify-between text-slate-500" },
+                    React.createElement("span", null, "Total MRP"),
+                    React.createElement("span", null, inr(receipt.mrpTotal))),
+                React.createElement("div", { className: "flex justify-between text-emerald-600 font-medium" },
+                    React.createElement("span", null, "You saved"),
+                    React.createElement("span", null, inr(receipt.mrpTotal - receipt.total))),
+                React.createElement("div", { className: "flex justify-between text-lg font-bold" },
+                    React.createElement("span", null, "Total paid"),
+                    React.createElement("span", null, inr(receipt.total)))),
+            React.createElement("p", { className: "text-xs text-slate-500 mt-3 text-center" }, "Stock has been deducted from live inventory."),
+            React.createElement("button", { onClick: () => setReceipt(null), className: "w-full mt-4 h-12 rounded-xl bg-slate-900 text-white font-semibold" }, "Done")));
+}
+/* ---------- AI Chat ---------- */
+function answer(q, products, priced, mode, sales) {
+    const s = q.toLowerCase();
+    const days = p => p.stock / p.vel;
+    const low = products.filter(p => p.stock <= p.thr).sort((a, b) => days(a) - days(b));
+    if (/low|running|reorder|stockout|out of/.test(s)) {
+        if (!low.length)
+            return 'All good. Nothing is below its reorder level right now.';
+        return `${low.length} item(s) are running low:\n` + low.map(p => `• ${p.name}: ${p.stock} left (~${Math.floor(days(p))} days)${p.ordered ? ' · restock ordered' : ''}`).join('\n') + '\n\nOpen the Reorder tab to approve supplier orders.';
+    }
+    if (/fast|moving|best|top|velocity|popular/.test(s)) {
+        const t = [...products].sort((a, b) => b.vel - a.vel).slice(0, 5);
+        return 'Your fastest movers (units/day):\n' + t.map((p, i) => `${i + 1}. ${p.name}: ${p.vel}/day, ${p.stock} in stock`).join('\n');
+    }
+    if (/value|worth|inventory/.test(s)) {
+        const cost = products.reduce((a, p) => a + p.cost * p.stock, 0), ret = products.reduce((a, p) => a + priced[p.id].price * p.stock, 0);
+        return `Current stock value:\n• At cost: ${inr(cost)}\n• At live selling prices: ${inr(ret)}\n• Potential gross profit: ${inr(ret - cost)}\n\nPricing mode: ${MODES[mode].label}.`;
+    }
+    if (/festival|diwali|discount|offer|clearance|overstock/.test(s)) {
+        const over = products.filter(p => days(p) > 25).sort((a, b) => days(b) - days(a));
+        const bump = products.filter(p => ['Snacks', 'Beverages', 'Household', 'Sweets'].includes(p.cat) && p.mrp - p.base >= 3 && days(p) <= 25).slice(0, 3);
+        let r = 'Festival plan:\n';
+        if (over.length)
+            r += '• Bundle or discount ~10-12% on overstock: ' + over.map(p => `${p.name} (${Math.floor(days(p))} days of stock)`).join(', ') + '\n';
+        if (bump.length)
+            r += '• Raise prices up to 8% (below MRP) on high-demand: ' + bump.map(p => p.name).join(', ') + '\n';
+        return r + '\nTry the Diwali Rush simulator on the Dashboard to preview it.';
+    }
+    if (/sale|sold|revenue|today|bill/.test(s)) {
+        if (!sales.length)
+            return 'No sales recorded this session yet. Make one in the Billing tab.';
+        const tot = sales.reduce((a, x) => a + x.total, 0);
+        const units = {};
+        sales.forEach(x => x.items.forEach(i => units[i.name] = (units[i.name] || 0) + i.qty));
+        const top = Object.entries(units).sort((a, b) => b[1] - a[1])[0];
+        return `${sales.length} bill(s) totalling ${inr(tot)}. Top seller this session: ${top[0]} (${top[1]} units).`;
+    }
+    if (/margin|profit/.test(s)) {
+        const m = [...products].map(p => ({ p, m: (priced[p.id].price - p.cost) / priced[p.id].price * 100 })).sort((a, b) => b.m - a.m);
+        return 'Best margins now:\n' + m.slice(0, 3).map(x => `• ${x.p.name}: ${Math.round(x.m)}%`).join('\n') + `\nThinnest: ${m[m.length - 1].p.name} at ${Math.round(m[m.length - 1].m)}%.`;
+    }
+    const hit = products.find(p => s.includes(p.name.toLowerCase().split(' ')[0]));
+    if (hit)
+        return `${hit.name}: ${hit.stock} in stock, sells ${hit.vel}/day (~${Math.floor(days(hit))} days left). Live price ${inr(priced[hit.id].price)} vs MRP ${inr(hit.mrp)}.`;
+    return 'I can help with low stock, fastest movers, stock value, festival discounts, sales and margins. Or ask about a product by name, like “How much Maggi is left?”';
+}
+function Chat({ products, priced, mode, sales }) {
+    const [msgs, setMsgs] = useState([{ r: 'ai', t: 'Namaste! I’m your Inventory AI. I read live data from your store, so my answers update after every sale.' }]);
+    const [v, setV] = useState('');
+    const [busy, setBusy] = useState(false);
+    const end = useRef(null);
+    useEffect(() => { end.current && end.current.scrollIntoView({ behavior: 'smooth' }); }, [msgs, busy]);
+    const send = t => {
+        if (!t.trim() || busy)
+            return;
+        setMsgs(m => [...m, { r: 'u', t }]);
+        setV('');
+        setBusy(true);
+        setTimeout(() => { setMsgs(m => [...m, { r: 'ai', t: answer(t, products, priced, mode, sales) }]); setBusy(false); }, 600);
+    };
+    const chips = ['Which items are running low?', 'What are my fastest-moving products?', 'Show current stock value', 'Suggest a festival discount', 'Show today’s sales'];
+    return React.createElement(Card, { className: "flex flex-col h-[calc(100vh-10.5rem)] lg:h-[calc(100vh-6rem)]" },
+        React.createElement("div", { className: "px-4 py-3 border-b border-slate-100 flex items-center gap-2" },
+            React.createElement("div", { className: "w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center" },
+                React.createElement(Icon, { n: "Bot", s: 20 })),
+            React.createElement("div", null,
+                React.createElement("div", { className: "font-semibold text-slate-900 text-sm" }, "Inventory AI"),
+                React.createElement("div", { className: "text-xs text-emerald-600" }, "\u25CF Reading live store data"))),
+        React.createElement("div", { className: "flex-1 overflow-y-auto p-4 space-y-3" },
+            msgs.map((m, i) => React.createElement("div", { key: i, className: `flex ${m.r === 'u' ? 'justify-end' : ''}` },
+                React.createElement("div", { className: `max-w-[85%] px-4 py-2.5 rounded-2xl text-sm whitespace-pre-line ${m.r === 'u' ? 'bg-indigo-600 text-white rounded-br-md' : 'bg-slate-100 text-slate-800 rounded-bl-md'}` }, m.t))),
+            busy && React.createElement("div", { className: "text-xs text-indigo-500 px-2" }, "AI is thinking\u2026"),
+            React.createElement("div", { ref: end })),
+        React.createElement("div", { className: "p-3 border-t border-slate-100 space-y-2" },
+            React.createElement("div", { className: "flex gap-2 overflow-x-auto no-sb" }, chips.map(c => React.createElement("button", { key: c, onClick: () => send(c), className: "shrink-0 h-10 px-3 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium" }, c))),
+            React.createElement("div", { className: "flex gap-2" },
+                React.createElement("input", { value: v, onChange: e => setV(e.target.value), onKeyDown: e => e.key === 'Enter' && send(v), placeholder: "Ask about your store\u2026", className: "flex-1 h-12 px-4 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500" }),
+                React.createElement("button", { onClick: () => send(v), className: "w-12 h-12 rounded-xl bg-indigo-600 text-white flex items-center justify-center" },
+                    React.createElement(Icon, { n: "Send", s: 18 })))));
+}
+/* ---------- Reorder ---------- */
+const restockQty = p => Math.max(p.thr, Math.ceil(p.vel * 14) - p.stock);
+function Reorder({ products, setProducts, toast, store }) {
+    const [sel, setSel] = useState(null);
+    const low = products.filter(p => p.stock <= p.thr || p.ordered).sort((a, b) => a.stock / a.vel - b.stock / b.vel);
+    const p = sel && products.find(x => x.id === sel);
+    const qty = p ? restockQty(p) : 0;
+    const msg = p ? `Namaste ${p.supplier},\n\nPlease supply the following for ${store.name}, ${store.address}:\n\n• ${p.name} × ${qty} units\n  (Est. cost ${inr(qty * p.cost)} at ${inr(p.cost)}/unit)\n\nCurrent stock: ${p.stock} units. Please deliver within 2 days.\n\nThank you,\n${store.owner}` : '';
+    const copyMsg = async () => {
+        let ok = false;
+        try {
+            await navigator.clipboard.writeText(msg);
+            ok = true;
+        }
+        catch (e) { }
+        if (!ok) {
+            try {
+                const t = document.createElement('textarea');
+                t.value = msg;
+                t.style.position = 'fixed';
+                t.style.opacity = '0';
+                document.body.appendChild(t);
+                t.select();
+                ok = document.execCommand('copy');
+                document.body.removeChild(t);
+            }
+            catch (e) { }
+        }
+        setProducts(ps => ps.map(x => x.id === p.id ? { ...x, ordered: true, orderQty: qty } : x));
+        toast(ok ? 'Message copied. Paste it in WhatsApp or Email.' : 'Copy blocked. Select the text and copy it manually.');
+        setSel(null);
+    };
+    const receive = x => { setProducts(ps => ps.map(y => y.id === x.id ? { ...y, stock: y.stock + y.orderQty, ordered: false, orderQty: 0 } : y)); toast(`${x.name} restocked +${x.orderQty}`); };
+    return React.createElement("div", { className: "space-y-3" },
+        React.createElement("p", { className: "text-sm text-slate-500" }, "Items at or below their reorder level are flagged automatically, with predicted days until stockout."),
+        !low.length && React.createElement(Card, { className: "p-8 text-center text-slate-500" }, "\uD83C\uDF89 All stock levels are healthy."),
+        low.map(x => {
+            const d = Math.floor(x.stock / x.vel);
+            return React.createElement(Card, { key: x.id, className: "p-4 flex flex-col sm:flex-row sm:items-center gap-3" },
+                React.createElement("div", { className: "flex items-center gap-3 flex-1" },
+                    React.createElement("div", { className: "text-3xl" }, x.emoji),
+                    React.createElement("div", null,
+                        React.createElement("div", { className: "font-semibold text-slate-900" }, x.name),
+                        React.createElement("div", { className: "text-xs text-slate-500" },
+                            "Stock ",
+                            x.stock,
+                            " \u00B7 Reorder at ",
+                            x.thr,
+                            " \u00B7 ",
+                            x.vel,
+                            "/day \u00B7 Supplier: ",
+                            x.supplier,
+                            x.phone ? ' (' + x.phone + ')' : ''),
+                        React.createElement("div", { className: "mt-1 flex gap-2 flex-wrap" },
+                            React.createElement(Badge, { tone: d <= 2 ? 'red' : 'amber' },
+                                React.createElement(Icon, { n: "AlertTriangle", s: 12 }),
+                                "Stockout in ~",
+                                d,
+                                " day",
+                                d === 1 ? '' : 's'),
+                            x.ordered && React.createElement(Badge, { tone: "green" },
+                                React.createElement(Icon, { n: "Truck", s: 12 }),
+                                "Restock Ordered (",
+                                x.orderQty,
+                                ")")))),
+                x.ordered ? React.createElement("button", { onClick: () => receive(x), className: "h-12 px-5 rounded-xl border border-emerald-600 text-emerald-700 font-semibold" }, "Mark as Received")
+                    : React.createElement("button", { onClick: () => { setSel(x.id); }, className: "h-12 px-5 rounded-xl bg-amber-500 text-white font-semibold" }, "Review & Approve Order"));
+        }),
+        p && React.createElement(Modal, { onClose: () => setSel(null) },
+            React.createElement("div", { className: "flex justify-between items-start" },
+                React.createElement("h3", { className: "font-bold text-lg" }, "Draft Supplier Order"),
+                React.createElement("button", { onClick: () => setSel(null), className: "w-9 h-9 flex items-center justify-center text-slate-400" },
+                    React.createElement(Icon, { n: "X" }))),
+            React.createElement("div", { className: "my-3 flex gap-2 items-start bg-amber-50 border border-amber-200 text-amber-800 text-sm rounded-xl p-3" },
+                React.createElement(Icon, { n: "AlertTriangle", s: 18, c: "shrink-0 mt-0.5" }),
+                React.createElement("span", null,
+                    "The backend for linking Email and WhatsApp is in development. For now, copy this message and paste it into your chat with ",
+                    p.supplier,
+                    p.phone ? ' (' + p.phone + ')' : '',
+                    ".")),
+            React.createElement("pre", { className: "whitespace-pre-wrap text-sm bg-slate-50 border border-slate-200 rounded-xl p-3 font-sans select-all" }, msg),
+            React.createElement("div", { className: "text-xs text-slate-500 mt-2" },
+                "Suggested quantity covers ~14 days of sales at ",
+                p.vel,
+                "/day. Copying also marks this item as Restock Ordered."),
+            React.createElement("button", { onClick: copyMsg, className: "w-full mt-4 h-12 rounded-xl bg-emerald-600 text-white font-semibold flex items-center justify-center gap-2" },
+                React.createElement(Icon, { n: "Copy", s: 18 }),
+                "Copy Message")));
+}
+/* ---------- Stock ---------- */
+const EMPTY = { name: '', emoji: '📦', cat: 'Staples', cost: '', base: '', mrp: '', stock: '', vel: '', thr: '', supplier: '', phone: '' };
+function ItemModal({ init, isNew, cats, onSave, onClose }) {
+    const [f, setF] = useState(init);
+    const [err, setErr] = useState('');
+    const set = (k, v) => setF(x => ({ ...x, [k]: v }));
+    const save = () => {
+        const n = k => parseFloat(f[k]);
+        if (!f.name.trim())
+            return setErr('Enter the item name.');
+        if (!f.cat.trim())
+            return setErr('Enter a category.');
+        if (![n('cost'), n('base'), n('mrp')].every(v => v > 0))
+            return setErr('Cost, selling price and MRP must be above 0.');
+        if (!(n('cost') <= n('base') && n('base') <= n('mrp')))
+            return setErr('Prices must follow: Cost ≤ Selling price ≤ MRP.');
+        if (!(n('stock') >= 0) || !(n('thr') >= 0))
+            return setErr('Enter stock and reorder level (0 or more).');
+        if (!(n('vel') > 0))
+            return setErr('Sales per day must be above 0.');
+        if (!f.supplier.trim())
+            return setErr('Add a supplier for this item.');
+        setErr('');
+        onSave({ name: f.name.trim(), emoji: f.emoji.trim() || '📦', cat: f.cat.trim(), cost: n('cost'), base: n('base'), mrp: n('mrp'), stock: Math.round(n('stock')), vel: n('vel'), thr: Math.round(n('thr')), supplier: f.supplier.trim(), phone: f.phone.trim() });
+    };
+    const Fld = ({ k, l, type = 'text', list, cls = '' }) => React.createElement("label", { className: `block ${cls}` },
+        React.createElement("span", { className: "text-xs text-slate-500" }, l),
+        React.createElement("input", { value: f[k], type: type, inputMode: type === 'number' ? 'decimal' : undefined, list: list, onChange: e => set(k, e.target.value), className: "w-full h-12 px-3 mt-1 rounded-xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-indigo-500" }));
+    return React.createElement(Modal, { onClose: onClose },
+        React.createElement("div", { className: "flex justify-between items-start mb-3" },
+            React.createElement("h3", { className: "font-bold text-lg" }, isNew ? 'Add New Item' : 'Edit Item'),
+            React.createElement("button", { onClick: onClose, className: "w-9 h-9 flex items-center justify-center text-slate-400" },
+                React.createElement(Icon, { n: "X" }))),
+        React.createElement("datalist", { id: "cats" }, cats.map(c => React.createElement("option", { key: c, value: c }))),
+        React.createElement("div", { className: "grid grid-cols-4 gap-3" },
+            React.createElement(Fld, { k: "emoji", l: "Icon", cls: "col-span-1" }),
+            React.createElement(Fld, { k: "name", l: "Item name", cls: "col-span-3" })),
+        React.createElement("div", { className: "mt-3" },
+            React.createElement(Fld, { k: "cat", l: "Category (pick or type a new one)", list: "cats" })),
+        React.createElement("div", { className: "grid grid-cols-3 gap-3 mt-3" },
+            React.createElement(Fld, { k: "cost", l: "Cost \u20B9", type: "number" }),
+            React.createElement(Fld, { k: "base", l: "Selling \u20B9", type: "number" }),
+            React.createElement(Fld, { k: "mrp", l: "MRP \u20B9", type: "number" })),
+        React.createElement("div", { className: "grid grid-cols-3 gap-3 mt-3" },
+            React.createElement(Fld, { k: "stock", l: "Stock", type: "number" }),
+            React.createElement(Fld, { k: "vel", l: "Sales / day", type: "number" }),
+            React.createElement(Fld, { k: "thr", l: "Reorder at", type: "number" })),
+        React.createElement("div", { className: "mt-4 p-3 rounded-xl bg-indigo-50 space-y-3" },
+            React.createElement("div", { className: "text-sm font-medium text-indigo-700 flex items-center gap-2" },
+                React.createElement(Icon, { n: "Truck", s: 16 }),
+                "Supplier for this item"),
+            React.createElement(Fld, { k: "supplier", l: "Supplier name" }),
+            React.createElement(Fld, { k: "phone", l: "Supplier phone / WhatsApp (optional)", type: "tel" })),
+        err && React.createElement("div", { className: "mt-3 text-sm text-rose-600" }, err),
+        React.createElement("button", { onClick: save, className: "w-full mt-4 h-12 rounded-xl bg-emerald-600 text-white font-semibold" }, isNew ? 'Add Item' : 'Save Changes'));
+}
+function AddStockModal({ p, onSave, onClose }) {
+    const [q, setQ] = useState('');
+    const n = parseInt(q, 10) || 0;
+    return React.createElement(Modal, { onClose: onClose },
+        React.createElement("div", { className: "flex justify-between items-start mb-1" },
+            React.createElement("h3", { className: "font-bold text-lg" }, "Add Stock"),
+            React.createElement("button", { onClick: onClose, className: "w-9 h-9 flex items-center justify-center text-slate-400" },
+                React.createElement(Icon, { n: "X" }))),
+        React.createElement("div", { className: "text-sm text-slate-500 mb-3" },
+            p.emoji,
+            " ",
+            p.name,
+            " \u00B7 currently ",
+            p.stock,
+            " units"),
+        React.createElement("input", { value: q, type: "number", inputMode: "numeric", onChange: e => setQ(e.target.value), placeholder: "Quantity received", className: "w-full h-12 px-3 rounded-xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-indigo-500" }),
+        React.createElement("div", { className: "flex gap-2 mt-3" }, [10, 25, 50, 100].map(v => React.createElement("button", { key: v, onClick: () => setQ(String(v)), className: "flex-1 h-11 rounded-xl bg-slate-100 text-sm font-medium text-slate-700" },
+            "+",
+            v))),
+        React.createElement("button", { disabled: n <= 0, onClick: () => onSave(n), className: "w-full mt-4 h-12 rounded-xl bg-emerald-600 disabled:bg-slate-300 text-white font-semibold" }, n > 0 ? `Add ${n} units (new stock ${p.stock + n})` : 'Enter a quantity'));
+}
+function StockPage({ products, setProducts, toast }) {
+    const [q, setQ] = useState('');
+    const [cat, setCat] = useState('All');
+    const [sort, setSort] = useState('days');
+    const [m, setM] = useState(null);
+    const cats = ['All', ...Array.from(new Set(products.map(p => p.cat)))];
+    const days = p => p.stock / p.vel;
+    const list = products.filter(p => (cat === 'All' || p.cat === cat) && p.name.toLowerCase().includes(q.toLowerCase()))
+        .sort((a, b) => sort === 'days' ? days(a) - days(b) : sort === 'name' ? a.name.localeCompare(b.name) : b.stock * b.cost - a.stock * a.cost);
+    const units = products.reduce((a, p) => a + p.stock, 0), value = products.reduce((a, p) => a + p.stock * p.cost, 0);
+    const lowN = products.filter(p => p.stock <= p.thr).length, over = products.filter(p => p.stock > p.thr && days(p) > 25).length;
+    const st = p => p.stock === 0 ? ['Out of stock', 'red', 'bg-rose-500'] : p.stock <= p.thr ? ['Low stock', 'amber', 'bg-amber-500'] : days(p) > 25 ? ['Overstock', 'indigo', 'bg-indigo-500'] : ['Healthy', 'green', 'bg-emerald-500'];
+    const Chip = ({ on, onClick, children }) => React.createElement("button", { onClick: onClick, className: `shrink-0 h-10 px-4 rounded-full text-sm font-medium ${on ? 'bg-slate-900 text-white' : 'bg-white border border-slate-200 text-slate-600'}` }, children);
+    const addItem = d => { setProducts(ps => [...ps, { ...d, id: Math.max(0, ...ps.map(x => x.id)) + 1, ordered: false, orderQty: 0 }]); setM(null); toast(d.name + ' added to inventory'); };
+    const editItem = d => { setProducts(ps => ps.map(x => x.id === m.p.id ? { ...x, ...d } : x)); setM(null); toast(d.name + ' updated'); };
+    const addStock = n => { setProducts(ps => ps.map(x => x.id === m.p.id ? { ...x, stock: x.stock + n } : x)); setM(null); toast(`+${n} units added to ${m.p.name}`); };
+    return React.createElement("div", { className: "space-y-4" },
+        React.createElement("div", { className: "grid grid-cols-2 lg:grid-cols-4 gap-3" },
+            React.createElement(Card, { className: "p-4" },
+                React.createElement("div", { className: "text-xs text-slate-500" }, "Products (SKUs)"),
+                React.createElement("div", { className: "text-2xl font-bold mt-1" }, products.length)),
+            React.createElement(Card, { className: "p-4" },
+                React.createElement("div", { className: "text-xs text-slate-500" }, "Total units in stock"),
+                React.createElement("div", { className: "text-2xl font-bold mt-1" }, units.toLocaleString('en-IN'))),
+            React.createElement(Card, { className: "p-4" },
+                React.createElement("div", { className: "text-xs text-slate-500" }, "Stock value (cost)"),
+                React.createElement("div", { className: "text-2xl font-bold text-emerald-600 mt-1" }, inr(value))),
+            React.createElement(Card, { className: "p-4" },
+                React.createElement("div", { className: "text-xs text-slate-500" }, "Needs attention"),
+                React.createElement("div", { className: "text-2xl font-bold text-amber-600 mt-1" },
+                    lowN,
+                    React.createElement("span", { className: "text-sm text-slate-400 font-normal" },
+                        " low \u00B7 ",
+                        over,
+                        " over")))),
+        React.createElement("div", { className: "flex gap-2" },
+            React.createElement("div", { className: "relative flex-1" },
+                React.createElement("span", { className: "absolute left-3 top-3.5 text-slate-400" },
+                    React.createElement(Icon, { n: "Search", s: 18 })),
+                React.createElement("input", { value: q, onChange: e => setQ(e.target.value), placeholder: "Search stock\u2026", className: "w-full h-12 pl-10 pr-3 rounded-xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-indigo-500" })),
+            React.createElement("button", { onClick: () => setM({ t: 'new' }), className: "h-12 px-4 rounded-xl bg-emerald-600 text-white font-semibold flex items-center gap-2 shrink-0" },
+                React.createElement(Icon, { n: "Plus", s: 18 }),
+                React.createElement("span", { className: "hidden sm:inline" }, "Add New Item"),
+                React.createElement("span", { className: "sm:hidden" }, "Add"))),
+        React.createElement("div", { className: "flex gap-2 overflow-x-auto no-sb" }, cats.map(c => React.createElement(Chip, { key: c, on: cat === c, onClick: () => setCat(c) }, c))),
+        React.createElement("div", { className: "flex gap-2 items-center overflow-x-auto no-sb" },
+            React.createElement("span", { className: "text-xs text-slate-500 shrink-0" }, "Sort by"),
+            [['days', 'Days left'], ['value', 'Stock value'], ['name', 'Name']].map(([k, l]) => React.createElement(Chip, { key: k, on: sort === k, onClick: () => setSort(k) }, l))),
+        React.createElement(Card, { className: "divide-y divide-slate-100 overflow-hidden" },
+            !list.length && React.createElement("div", { className: "p-8 text-center text-slate-400 text-sm" }, "No products match."),
+            list.map(p => {
+                const [lbl, tone, bar] = st(p);
+                const pct = Math.min(100, p.stock / (p.thr * 3 || 1) * 100);
+                return React.createElement("div", { key: p.id, className: "p-4 flex items-start gap-3" },
+                    React.createElement("div", { className: "text-3xl w-10 text-center" }, p.emoji),
+                    React.createElement("div", { className: "flex-1 min-w-0" },
+                        React.createElement("div", { className: "flex items-center gap-2 flex-wrap" },
+                            React.createElement("span", { className: "font-medium text-slate-900 text-sm" }, p.name),
+                            React.createElement(Badge, { tone: tone }, lbl)),
+                        React.createElement("div", { className: "h-2 rounded-full bg-slate-100 mt-2 overflow-hidden" },
+                            React.createElement("div", { className: `h-full rounded-full ${bar}`, style: { width: pct + '%' } })),
+                        React.createElement("div", { className: "text-xs text-slate-500 mt-1" },
+                            p.cat,
+                            " \u00B7 reorder at ",
+                            p.thr,
+                            " \u00B7 ",
+                            p.vel,
+                            "/day \u00B7 ~",
+                            Math.floor(days(p)),
+                            " days of cover"),
+                        React.createElement("div", { className: "text-xs text-indigo-600 mt-1 flex items-center gap-1" },
+                            React.createElement(Icon, { n: "Truck", s: 12 }),
+                            p.supplier,
+                            p.phone ? ' · ' + p.phone : ''),
+                        React.createElement("div", { className: "flex gap-2 mt-2" },
+                            React.createElement("button", { onClick: () => setM({ t: 'stock', p }), className: "h-10 px-3 rounded-lg bg-emerald-50 text-emerald-700 text-sm font-medium flex items-center gap-1" },
+                                React.createElement(Icon, { n: "Plus", s: 14 }),
+                                "Add stock"),
+                            React.createElement("button", { onClick: () => setM({ t: 'edit', p }), className: "h-10 px-3 rounded-lg bg-slate-100 text-slate-700 text-sm font-medium flex items-center gap-1" },
+                                React.createElement(Icon, { n: "Pencil", s: 14 }),
+                                "Edit / supplier"))),
+                    React.createElement("div", { className: "text-right" },
+                        React.createElement("div", { className: "text-lg font-bold text-slate-900" }, p.stock),
+                        React.createElement("div", { className: "text-xs text-slate-500" }, "units"),
+                        React.createElement("div", { className: "text-xs text-emerald-600" }, inr(p.stock * p.cost))));
+            })),
+        m && m.t === 'new' && React.createElement(ItemModal, { isNew: true, init: EMPTY, cats: cats.slice(1), onSave: addItem, onClose: () => setM(null) }),
+        m && m.t === 'edit' && React.createElement(ItemModal, { init: Object.fromEntries(Object.entries(m.p).map(([k, v]) => [k, String(v)])), cats: cats.slice(1), onSave: editItem, onClose: () => setM(null) }),
+        m && m.t === 'stock' && React.createElement(AddStockModal, { p: m.p, onSave: addStock, onClose: () => setM(null) }));
+}
+/* ---------- Profile ---------- */
+function Profile({ store, setStore, dark, setDark, toast }) {
+    const [edit, setEdit] = useState(false);
+    const [f, setF] = useState(store);
+    const initials = store.name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase() || 'S';
+    const rows = [['Real-time multi-device sync', 'RefreshCw'], ['Automatic cloud backup', 'Cloud'], ['Staff accounts & permissions', 'Users']];
+    const fields = [['name', 'Store name'], ['owner', 'Owner name'], ['address', 'Address'], ['phone', 'Phone'], ['gstin', 'GSTIN']];
+    const save = () => { if (!f.name.trim()) {
+        toast('Store name is required');
+        return;
+    } setStore(f); setEdit(false); toast('Business details updated'); };
+    return React.createElement("div", { className: "space-y-4 max-w-2xl" },
+        React.createElement(Card, { className: "p-5 flex items-center gap-4" },
+            React.createElement("div", { className: "w-16 h-16 rounded-2xl bg-emerald-600 text-white text-2xl font-bold flex items-center justify-center" }, initials),
+            React.createElement("div", null,
+                React.createElement("div", { className: "text-lg font-bold text-slate-900" }, store.name),
+                React.createElement("div", { className: "text-sm text-slate-500" },
+                    "Owner: ",
+                    store.owner),
+                React.createElement("div", { className: "text-sm text-slate-500" }, store.address))),
+        React.createElement(Card, { className: "divide-y divide-slate-100" }, [['GSTIN', store.gstin], ['Phone', store.phone], ['Plan', 'AirStock Starter'], ['Currency', 'Indian Rupee (₹)']].map(([a, b]) => React.createElement("div", { key: a, className: "px-5 py-3 flex justify-between text-sm gap-4" },
+            React.createElement("span", { className: "text-slate-500" }, a),
+            React.createElement("span", { className: "font-medium text-slate-900 text-right" }, b)))),
+        React.createElement(Card, { className: "p-5" },
+            React.createElement("h3", { className: "font-semibold text-slate-900 mb-3" }, "Settings"),
+            React.createElement("div", { className: "space-y-3" },
+                React.createElement("div", { className: "flex items-center gap-3" },
+                    React.createElement("div", { className: "w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600" },
+                        React.createElement(Icon, { n: "Store", s: 20 })),
+                    React.createElement("div", { className: "flex-1" },
+                        React.createElement("div", { className: "text-sm font-medium text-slate-900" }, "Business details"),
+                        React.createElement("div", { className: "text-xs text-slate-500" }, "Change store name, owner, address, phone and GSTIN")),
+                    React.createElement("button", { onClick: () => { setF(store); setEdit(true); }, className: "h-11 px-4 rounded-xl bg-slate-900 text-white text-sm font-semibold flex items-center gap-2" },
+                        React.createElement(Icon, { n: "Pencil", s: 14 }),
+                        "Edit")),
+                React.createElement("div", { className: "flex items-center gap-3" },
+                    React.createElement("div", { className: "w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-600" },
+                        React.createElement(Icon, { n: dark ? 'Moon' : 'Sun', s: 20 })),
+                    React.createElement("div", { className: "flex-1" },
+                        React.createElement("div", { className: "text-sm font-medium text-slate-900" }, "Appearance"),
+                        React.createElement("div", { className: "text-xs text-slate-500" }, "Switch between light and dark mode")),
+                    React.createElement("div", { className: "flex rounded-xl bg-slate-100 p-1" }, [['Light', false], ['Dark', true]].map(([l, v]) => React.createElement("button", { key: l, onClick: () => setDark(v), className: `h-9 px-4 rounded-lg text-sm font-medium ${dark === v ? 'bg-emerald-600 text-white' : 'text-slate-600'}` }, l)))))),
+        React.createElement(Card, { className: "p-5 bg-gradient-to-br from-indigo-50 to-white" },
+            React.createElement("div", { className: "flex items-center justify-between flex-wrap gap-2" },
+                React.createElement("div", { className: "flex items-center gap-2" },
+                    React.createElement(Icon, { n: "Cloud", c: "text-indigo-600" }),
+                    React.createElement("h3", { className: "font-semibold text-slate-900" }, "Cloud Sync & Multi-Device Backup")),
+                React.createElement(Badge, { tone: "indigo" },
+                    React.createElement(Icon, { n: "Hammer", s: 12 }),
+                    "In Development \u00B7 Coming Soon")),
+            React.createElement("div", { className: "mt-4 space-y-2" }, rows.map(([l, ic]) => React.createElement("div", { key: l, className: "flex items-center justify-between bg-white border border-slate-200 rounded-xl px-4 py-3 opacity-70" },
+                React.createElement("span", { className: "flex items-center gap-2 text-sm text-slate-700" },
+                    React.createElement(Icon, { n: ic, s: 16 }),
+                    l),
+                React.createElement("button", { disabled: true, "aria-disabled": "true", className: "w-12 h-7 rounded-full bg-slate-200 relative cursor-not-allowed" },
+                    React.createElement("span", { className: "absolute left-1 top-1 w-5 h-5 rounded-full bg-white shadow" }))))),
+            React.createElement("p", { className: "text-xs text-slate-500 mt-3" }, "Cloud data syncing will be live in the upcoming release. Until then, your data stays on this device for this session.")),
+        edit && React.createElement(Modal, { onClose: () => setEdit(false) },
+            React.createElement("div", { className: "flex justify-between items-start mb-3" },
+                React.createElement("h3", { className: "font-bold text-lg" }, "Edit Business Details"),
+                React.createElement("button", { onClick: () => setEdit(false), className: "w-9 h-9 flex items-center justify-center text-slate-400" },
+                    React.createElement(Icon, { n: "X" }))),
+            React.createElement("div", { className: "space-y-3" }, fields.map(([k, l]) => React.createElement("label", { key: k, className: "block" },
+                React.createElement("span", { className: "text-xs text-slate-500" }, l),
+                React.createElement("input", { value: f[k], onChange: e => setF({ ...f, [k]: e.target.value }), className: "w-full h-12 px-3 mt-1 rounded-xl border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-indigo-500" })))),
+            React.createElement("button", { onClick: save, className: "w-full mt-4 h-12 rounded-xl bg-emerald-600 text-white font-semibold" }, "Save Changes")));
+}
+/* ---------- App ---------- */
+function App() {
+    const [tab, setTab] = useState('dash');
+    const [products, setProducts] = useState(SEED);
+    const [mode, setMode] = useState('normal');
+    const [sales, setSales] = useState([]);
+    const [msg, setMsg] = useState(null);
+    const [store, setStore] = useState({ name: 'Sharma General Store', owner: 'Rajesh Sharma', address: 'Sector 11, Panchkula, Haryana', phone: '+91 98765 43210', gstin: '06ABCDE1234F1Z5' });
+    const [dark, setDark] = useState(() => { try {
+        return localStorage.getItem('as-theme') === 'dark';
+    }
+    catch (e) {
+        return false;
+    } });
+    useEffect(() => { document.documentElement.classList.toggle('dark', dark); try {
+        localStorage.setItem('as-theme', dark ? 'dark' : 'light');
+    }
+    catch (e) { } }, [dark]);
+    const toast = t => { setMsg(t); setTimeout(() => setMsg(null), 2600); };
+    const priced = useMemo(() => Object.fromEntries(products.map(p => [p.id, calc(p, mode)])), [products, mode]);
+    const lowCount = products.filter(p => p.stock <= p.thr && !p.ordered).length;
+    const nav = [['dash', 'Dashboard', 'LayoutDashboard'], ['bill', 'Billing', 'Receipt'], ['ai', 'Inventory AI', 'Bot'], ['reorder', 'Reorder', 'Truck'], ['stock', 'Stock', 'Boxes'], ['profile', 'Profile', 'User']];
+    const titles = { dash: 'Dashboard & Smart Pricing', bill: 'Billing (POS)', ai: 'Inventory AI', reorder: 'Supplier Reordering', stock: 'Stock Overview', profile: 'Profile & Settings' };
+    return React.createElement("div", { className: "min-h-screen" },
+        React.createElement("aside", { className: "hidden md:flex fixed inset-y-0 left-0 w-64 bg-slate-900 text-slate-300 flex-col p-4" },
+            React.createElement("div", { className: "flex items-center gap-2 text-white text-xl font-bold px-2 py-3" },
+                React.createElement("span", { className: "w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center" },
+                    React.createElement(Icon, { n: "Package", s: 20 })),
+                "AirStock"),
+            React.createElement("nav", { className: "mt-4 space-y-1" }, nav.map(([k, l, ic]) => React.createElement("button", { key: k, onClick: () => setTab(k), className: `w-full h-12 px-3 rounded-xl flex items-center gap-3 text-sm font-medium ${tab === k ? 'bg-slate-800 text-white' : 'hover:bg-slate-800/60'}` },
+                React.createElement(Icon, { n: ic, s: 18 }),
+                l,
+                k === 'reorder' && lowCount > 0 && React.createElement("span", { className: "ml-auto bg-amber-500 text-white text-xs rounded-full px-2" }, lowCount)))),
+            React.createElement("div", { className: "mt-auto p-3 rounded-xl bg-slate-800 text-xs" },
+                React.createElement("div", { className: "text-white font-medium" }, store.name),
+                React.createElement("div", { className: "text-slate-400" }, MODES[mode].label))),
+        React.createElement("main", { className: "md:ml-64 p-4 sm:p-6 pb-28 md:pb-6" },
+            React.createElement("header", { className: "flex items-center justify-between mb-5" },
+                React.createElement("div", null,
+                    React.createElement("div", { className: "text-xs text-slate-500 md:hidden font-semibold text-emerald-600" }, "AirStock"),
+                    React.createElement("h1", { className: "text-xl sm:text-2xl font-bold text-slate-900" }, titles[tab])),
+                React.createElement(Badge, { tone: "indigo" },
+                    React.createElement(Icon, { n: MODES[mode].icon, s: 12 }),
+                    MODES[mode].label)),
+            tab === 'dash' && React.createElement(Dashboard, { products, priced, mode, setMode, sales }),
+            tab === 'bill' && React.createElement(Billing, { products, priced, sales, setSales, setProducts, toast, store }),
+            tab === 'ai' && React.createElement(Chat, { products, priced, mode, sales }),
+            tab === 'reorder' && React.createElement(Reorder, { products, setProducts, toast, store }),
+            tab === 'stock' && React.createElement(StockPage, { products, setProducts, toast }),
+            tab === 'profile' && React.createElement(Profile, { store, setStore, dark, setDark, toast })),
+        React.createElement("nav", { className: "md:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 grid grid-cols-6", style: { paddingBottom: 'env(safe-area-inset-bottom,0px)' } }, nav.map(([k, l, ic]) => React.createElement("button", { key: k, onClick: () => setTab(k), className: `relative h-16 flex flex-col items-center justify-center gap-1 text-[10px] font-medium ${tab === k ? 'text-emerald-600' : 'text-slate-500'}` },
+            React.createElement(Icon, { n: ic, s: 22 }),
+            l.replace('Inventory ', '').replace('Dashboard', 'Home'),
+            k === 'reorder' && lowCount > 0 && React.createElement("span", { className: "absolute top-2 right-3 bg-amber-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center" }, lowCount)))),
+        msg && React.createElement("div", { className: "fixed top-4 left-1/2 -translate-x-1/2 z-[60] bg-slate-900 text-white text-sm px-4 py-3 rounded-xl shadow-lg max-w-[90vw]" }, msg));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(App, null));
+
+</script>
+</body>
+</html>
