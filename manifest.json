@@ -1,0 +1,16 @@
+{
+  "background_color": "#ffffff",
+  "dir": "ltr",
+  "display": "standalone",
+  "name": "Airstock",
+  "orientation": "portrait",
+  "scope": "/",
+  "short_name": "Airstock",
+  "start_url": "/",
+  "theme_color": "#ffffff",
+  "id": "airstock",
+  "description": "AirStock is a smart inventory and billing app for kirana stores, general stores and small retail shops. It adjusts prices to the season, keeps your stock count accurate after every sale and tells you what to reorder before you run out.\n\nSmart Pricing\nPick a market condition (Normal Season, Diwali Rush, Monsoon Slowdown or Clearance Mode). AirStock updates your prices instantly with strategic bumps or discounts, and never goes above the MRP. Each change shows a badge explaining why the price moved.\n\nFast Billing (POS)\n\nSearch or tap products to build a bill in seconds.\nLive smart prices are used automatically.\nCustomers see how much they save against MRP.\nOne tap completes the sale, generates a digital receipt and deducts the sold quantities from your stock.\n\nInventory AI\nAsk questions about your store in plain language, such as \"Which items are running low?\", \"What are my fastest-moving products?\", \"Show current stock value\" or \"Suggest a festival discount\". Answers come from your live data, so they stay correct after every sale.\n\nStock Management\n\nSee every item with stock levels, days of cover and status (Healthy, Low, Overstock or Out of stock).\nAdd new items, record received stock, and assign a supplier to each product.\nSearch, filter by category and sort by days left or stock value.\n\nAutomatic Supplier Reordering\nAirStock flags low-stock items and predicts days until stockout. It then drafts a ready-to-send supplier message with a suggested quantity, which you can copy and paste into WhatsApp or email.\n\nYour Store, Your Settings\nEdit your business details and switch between light and dark mode. Works on both laptops and phones.\n\nComing Soon: Cloud sync, automatic backup and multi-device access with staff accounts.\n\nDeveloped by Tek Haven.",
+  "categories": [
+    "business"
+  ]
+}
